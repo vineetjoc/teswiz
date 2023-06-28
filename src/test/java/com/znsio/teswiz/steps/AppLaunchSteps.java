@@ -9,6 +9,7 @@ import com.znsio.teswiz.runner.Runner;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
 
 import java.util.Locale;
 
@@ -25,7 +26,7 @@ public class AppLaunchSteps {
     public void startOn(String userPersona, String appName) {
         String[] appNameParts = appName.split("-");
         appName = appNameParts[0].toLowerCase(Locale.ROOT) + "_" + Runner.getCloudName()
-                                                                         .toLowerCase();
+                                                                           .toLowerCase();
         String onPlatform = appNameParts[appNameParts.length - 1].toLowerCase(Locale.ROOT);
         LOGGER.info(System.out.printf("startOn - Persona:'%s', AppName: '%s', Platform: '%s'",
                                       userPersona, appName, onPlatform));
@@ -67,12 +68,10 @@ public class AppLaunchSteps {
         String browser = details[0];
         String mobileEmulation = details[1];
 
-        //TODO add logic to get deviceName from Browser Config json file based on
-        // 'mobileEmulation' variable
-        // & add it in context for future reference
-
-        //upon fetching the value of deviceName, replace it in below line
-        context.addTestState(TEST_CONTEXT.MOBILE_EMULATION_DEVICE, "deviceName");
+        //Fetching deviceName from Browser Config json file based on 'mobileEmulation' variable
+        String deviceName = new JSONObject(Runner.getBrowserConfigFileContents()).getString(mobileEmulation);
+        LOGGER.info("Device name from browser config file :" + deviceName);
+        context.addTestState(TEST_CONTEXT.MOBILE_EMULATION_DEVICE, deviceName);
 
         return browser;
     }

@@ -1,23 +1,23 @@
 package com.znsio.teswiz.runner;
 
 import com.context.TestExecutionContext;
-import com.epam.reportportal.service.ReportPortal;
 import com.znsio.teswiz.entities.Platform;
 import com.znsio.teswiz.entities.TEST_CONTEXT;
 import com.znsio.teswiz.exceptions.EnvironmentSetupException;
 import com.znsio.teswiz.exceptions.InvalidTestDataException;
 import com.znsio.teswiz.tools.JsonFile;
 import com.znsio.teswiz.tools.JsonSchemaValidator;
+import com.znsio.teswiz.tools.ReportPortalLogger;
 import com.znsio.teswiz.tools.cmd.CommandLineExecutor;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import io.github.bonigarcia.wdm.config.DriverManagerType;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverLogLevel;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxDriverLogLevel;
@@ -201,6 +201,7 @@ class BrowserDriverManager {
                 "Using webDriverManagerProxyUrl: '%s' for getting the WebDriver for browser: '%s'",
                 webDriverManagerProxyUrl, browserType));
 
+        // TODO - get browser version from local or container. What about cloud?
         WebDriverManager webDriverManager = WebDriverManager.getInstance(driverManagerType)
                                                             .proxy(webDriverManagerProxyUrl);
         webDriverManager.setup();
@@ -209,7 +210,7 @@ class BrowserDriverManager {
         String message = String.format("Using %s browser version: %s", driverManagerType,
                                        downloadedDriverVersion);
         LOGGER.info(message);
-        ReportPortal.emitLog(message, INFO, new Date());
+        ReportPortalLogger.logInfoMessage(message);
         return driverManagerType;
     }
 
@@ -224,6 +225,7 @@ class BrowserDriverManager {
         String proxyUrl = Runner.getProxyURL();
 
         ChromeOptions chromeOptions = new ChromeOptions();
+        chromeOptions.addArguments("--disable-gpu");
 
         setLogFileName(forUserPersona, testExecutionContext, "Chrome");
 
@@ -242,11 +244,15 @@ class BrowserDriverManager {
         LoggingPreferences logPrefs = new LoggingPreferences();
         if(enableVerboseLogging) {
             System.setProperty("webdriver.chrome.verboseLogging", "true");
+            chromeOptions.setLogLevel(ChromeDriverLogLevel.DEBUG);
+            logPrefs.enable(LogType.BROWSER, Level.ALL);
             logPrefs.enable(LogType.PERFORMANCE, Level.ALL);
         } else {
-            logPrefs.enable(LogType.BROWSER, Level.ALL);
+            chromeOptions.setLogLevel(ChromeDriverLogLevel.INFO);
+            logPrefs.enable(LogType.BROWSER, Level.INFO);
+            logPrefs.enable(LogType.PERFORMANCE, Level.INFO);
         }
-        chromeOptions.setCapability(CapabilityType.LOGGING_PREFS, logPrefs);
+        chromeOptions.setCapability(ChromeOptions.LOGGING_PREFS, logPrefs);
 
         if(null != proxyUrl) {
             LOGGER.info(SETTING_PROXY_FOR_BROWSER + proxyUrl);
@@ -335,12 +341,14 @@ class BrowserDriverManager {
         LoggingPreferences logPrefs = new LoggingPreferences();
         if(enableVerboseLogging) {
             firefoxOptions.setLogLevel(FirefoxDriverLogLevel.DEBUG);
+            logPrefs.enable(LogType.BROWSER, Level.ALL);
             logPrefs.enable(LogType.PERFORMANCE, Level.ALL);
         } else {
             firefoxOptions.setLogLevel(FirefoxDriverLogLevel.INFO);
-            logPrefs.enable(LogType.BROWSER, Level.ALL);
+            logPrefs.enable(LogType.BROWSER, Level.INFO);
+            logPrefs.enable(LogType.PERFORMANCE, Level.INFO);
         }
-        firefoxOptions.setCapability(CapabilityType.LOGGING_PREFS, logPrefs);
+        firefoxOptions.setCapability("moz:firefoxOptions",logPrefs);
 
         if(null != proxyUrl) {
             LOGGER.info(SETTING_PROXY_FOR_BROWSER + proxyUrl);
@@ -371,13 +379,12 @@ class BrowserDriverManager {
                                                 TestExecutionContext testExecutionContext,
                                                 JSONObject safariConfigurations) {
         SafariOptions safariOptions = new SafariOptions();
-        DesiredCapabilities caps = DesiredCapabilities.safari();
         boolean setUseTechnologyPreview = safariConfigurations.getBoolean(
                 "setUseTechnologyPreview");
         boolean acceptInsecureCerts = safariConfigurations.getBoolean(ACCEPT_INSECURE_CERTS);
         String proxyUrl = Runner.getProxyURL();
         shouldBrowserBeMaximized = safariConfigurations.getBoolean(MAXIMIZE);
-        caps.setCapability(ACCEPT_INSECURE_CERTS, acceptInsecureCerts);
+        safariOptions.setCapability(ACCEPT_INSECURE_CERTS, acceptInsecureCerts);
         if(null != proxyUrl) {
             LOGGER.info(String.format("%s%s", SETTING_PROXY_FOR_BROWSER, proxyUrl));
             safariOptions.setProxy(new Proxy().setHttpProxy(proxyUrl));
@@ -415,7 +422,7 @@ class BrowserDriverManager {
 
         String logMessage = String.format("Creating %s logs in file: %s", browserType, logFile);
         LOGGER.info(logMessage);
-        ReportPortal.emitLog(logMessage, DEBUG, new Date());
+        ReportPortalLogger.logDebugMessage(logMessage);
         System.setProperty("webdriver." + browserType + ".logfile", logFile);
         addBrowserLogFileNameFor(forUserPersona, Platform.web.name(), browserType, logFile);
     }
@@ -474,7 +481,7 @@ class BrowserDriverManager {
         String logMessage = String.format("Browser logs for user: %s" + "%nlogFileName: %s",
                                           userPersona, logFileName);
         LOGGER.info(logMessage);
-        ReportPortal.emitLog(logMessage, DEBUG, new Date(), new File(logFileName));
+        ReportPortalLogger.attachFileInReportPortal(logMessage, new File(logFileName));
 
         WebDriver webDriver = driver.getInnerDriver();
         if(null == webDriver) {
@@ -484,7 +491,7 @@ class BrowserDriverManager {
         } else {
             logMessage = String.format("Closing WebDriver for user: '%s'", userPersona);
             LOGGER.info(logMessage);
-            ReportPortal.emitLog(logMessage, DEBUG, new Date());
+            ReportPortalLogger.logDebugMessage(logMessage);
             webDriver.quit();
         }
     }

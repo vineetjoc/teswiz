@@ -8,7 +8,9 @@ import org.apache.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.openqa.selenium.Capabilities;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.context.SessionContext.getTestExecutionContext;
 import static com.znsio.teswiz.runner.Runner.DEFAULT;
@@ -197,13 +199,17 @@ public class Drivers {
         return userPersonaDetails.getPlatformAssignedForUser(userPersona);
     }
 
-    static void attachLogsAndCloseAllWebDrivers() {
+    public static void attachLogsAndCloseAllDrivers() {
         long currentThreadId = Thread.currentThread().getId();
         LOGGER.info(String.format("Close all drivers for test on ThreadId: - %d", currentThreadId));
         TestExecutionContext context = getTestExecutionContext(currentThreadId);
         UserPersonaDetails userPersonaDetails = getUserPersonaDetails(context);
 
-        userPersonaDetails.getAllAssignedUserPersonasAndDrivers().forEach((userPersona, driver) -> {
+        Map<String, Driver> allAssignedUserPersonasAndDrivers =
+                userPersonaDetails.getAllAssignedUserPersonasAndDrivers();
+        LOGGER.info("Closing driver for the following userPersonas: " + allAssignedUserPersonasAndDrivers.keySet());
+        allAssignedUserPersonasAndDrivers.forEach((userPersona, driver) -> {
+            driver.getVisual().takeScreenshot("afterHooks", userPersona);
             LOGGER.info(String.format(
                     "\tGetting visual validation results and closing driver for: User Persona: %s",
                     userPersona));
@@ -242,7 +248,10 @@ public class Drivers {
     public static Set<String> getAvailableUserPersonas() {
         UserPersonaDetails userPersonaDetails = getUserPersonaDetails(
                 getTestExecutionContext(Thread.currentThread().getId()));
-        return userPersonaDetails.getAllUserPersonasForAssignedDrivers();
+        String userPersonaPrefix = Thread.currentThread().getId() + "-";
+        return userPersonaDetails.getAllUserPersonasForAssignedDrivers().stream()
+                                 .map(personaForCurrentThread -> personaForCurrentThread.replace(
+                                         userPersonaPrefix, "")).collect(Collectors.toSet());
     }
 
     public static void assignNewPersonaToExistingDriver(String userPersona, String newUserPersona,
@@ -258,16 +267,12 @@ public class Drivers {
 
         Driver currentDriver = userPersonaDetails.getDriverAssignedForUser(userPersona);
         Platform currentPlatform = userPersonaDetails.getPlatformAssignedForUser(userPersona);
-        Capabilities userPersonaCapabilities = userPersonaDetails.getCapabilitiesAssignedForUser(
-                userPersona);
 
         context.addTestState(TEST_CONTEXT.CURRENT_DRIVER, currentDriver);
         context.addTestState(TEST_CONTEXT.CURRENT_USER_PERSONA, newUserPersona);
         context.addTestState(TEST_CONTEXT.CURRENT_PLATFORM, currentPlatform);
 
-        userPersonaDetails.replaceDriverFor(userPersona, currentDriver);
-        userPersonaDetails.replacePlatformFor(userPersona, currentPlatform);
-        userPersonaDetails.replaceCapabilitiesFor(userPersona, userPersonaCapabilities);
+        userPersonaDetails.assignNewPersonaForUser(userPersona, newUserPersona);
 
         LOGGER.info(
                 String.format("assignNewPersonaToExistingDriver: Persona updated from '%s' to '%s'",
@@ -278,6 +283,14 @@ public class Drivers {
         UserPersonaDetails userPersonaDetails = getUserPersonaDetails(
                 Runner.getTestExecutionContext(Thread.currentThread().getId()));
         userPersonaDetails.addCapabilities(userPersona, capabilities);
+    }
+
+    static void addUserPersonaDeviceLogFileName(String userPersona, String deviceLogsFileName,
+                                                Platform forPlatform) {
+        UserPersonaDetails userPersonaDetails = getUserPersonaDetails(
+                Runner.getTestExecutionContext(Thread.currentThread().getId()));
+        userPersonaDetails.addDeviceLogFileNameFor(userPersona, forPlatform.name(),
+                                                   deviceLogsFileName);
     }
 
     static Capabilities getCapabilitiesFor(String userPersona) {
@@ -295,4 +308,5 @@ public class Drivers {
     public static Visual getVisualDriverForCurrentUser(long threadId) {
         return getDriverForCurrentUser(threadId).getVisual();
     }
+
 }

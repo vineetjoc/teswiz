@@ -32,3 +32,6 @@ local.properties
 upload
 libs
 *.plantuml
+reportportal.lock
+reportportal.sync
+.vscode/*

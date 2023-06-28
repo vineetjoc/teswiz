@@ -80,7 +80,7 @@ class Setup {
     private static final String PROXY_KEY = "PROXY_KEY";
     private static final String WEBDRIVER_MANAGER_PROXY_KEY = "WEBDRIVER_MANAGER_PROXY_KEY";
     private static final String TEST_DATA_FILE = "TEST_DATA_FILE";
-    private static final String APPLITOOLS_CONFIGURATION = "APPLITOOLS_CONFIGURATION";
+    static final String APPLITOOLS_CONFIGURATION = "APPLITOOLS_CONFIGURATION";
     private static final String LAUNCH_NAME_SUFFIX = "LAUNCH_NAME_SUFFIX";
     private static final String REMOTE_WEBDRIVER_GRID_PORT_KEY = "REMOTE_WEBDRIVER_GRID_PORT_KEY";
     private static final Logger LOGGER = Logger.getLogger(Setup.class.getName());
@@ -101,7 +101,16 @@ class Setup {
 
     static void load(String providedConfigFilePath) {
         configFilePath = providedConfigFilePath;
+        reset();
         properties = loadProperties(configFilePath);
+    }
+
+    private static void reset() {
+        properties = null;
+        configs.clear();
+        configsBoolean.clear();
+        configsInteger.clear();
+        applitoolsConfiguration.clear();
     }
 
     @NotNull
@@ -270,30 +279,30 @@ class Setup {
 
     @NotNull
     private static String printStringMap(String prefix, Map<String, String> printConfig) {
-        StringBuilder printString = new StringBuilder(prefix + ": %n");
+        StringBuilder printString = new StringBuilder(prefix + ": \n");
         for(Map.Entry<String, String> entry : printConfig.entrySet()) {
             printString.append("\t").append(entry.getKey()).append("=").append(entry.getValue())
-                       .append("%n");
+                       .append("\n");
         }
         return printString.toString() + printConfig;
     }
 
     @NotNull
     private static String printBooleanMap(String prefix, Map<String, Boolean> printConfig) {
-        StringBuilder printString = new StringBuilder(prefix + ": %n");
+        StringBuilder printString = new StringBuilder(prefix + ": \n");
         for(Map.Entry<String, Boolean> entry : printConfig.entrySet()) {
             printString.append("\t").append(entry.getKey()).append("=").append(entry.getValue())
-                       .append("%n");
+                       .append("\n");
         }
         return printString.toString() + printConfig;
     }
 
     @NotNull
     private static String printIntegerMap(String prefix, Map<String, Integer> printConfig) {
-        StringBuilder printString = new StringBuilder(prefix + ": %n");
+        StringBuilder printString = new StringBuilder(prefix + ": \n");
         for(Map.Entry<String, Integer> entry : printConfig.entrySet()) {
             printString.append("\t").append(entry.getKey()).append("=").append(entry.getValue())
-                       .append("%n");
+                       .append("\n");
         }
         return printString.toString() + printConfig;
     }
@@ -385,7 +394,7 @@ class Setup {
         configs.put(PROXY_KEY, getOverriddenStringValue(PROXY_KEY,
                                                         getStringValueFromPropertiesIfAvailable(
                                                                 PROXY_KEY, PROXY_KEY)));
-        configs.put(PROXY_URL, getOverriddenStringValue(configs.get(PROXY_KEY)));
+        configs.put(PROXY_URL, (null != configs.get(PROXY_KEY)) ? getOverriddenStringValue(configs.get(PROXY_KEY)) : configs.put(PROXY_URL, null));
         configs.put(WEBDRIVER_MANAGER_PROXY_KEY,
                     getOverriddenStringValue(WEBDRIVER_MANAGER_PROXY_KEY,
                                              getStringValueFromPropertiesIfAvailable(
@@ -426,7 +435,7 @@ class Setup {
 
     private static void getPlatformTagsAndLaunchName() {
         LOGGER.info("Get Platform, Tags and LaunchName");
-        String launchName = configs.get(APP_NAME) + " Automated Tests Report";
+        String launchName = configs.get(APP_NAME);
         if(Boolean.TRUE.equals(configsBoolean.get(RUN_IN_CI))) {
             launchName += " on Device Farm";
         }
@@ -531,6 +540,7 @@ class Setup {
             applitoolsConfiguration.put(TARGET_ENVIRONMENT, configs.get(TARGET_ENVIRONMENT));
             applitoolsConfiguration.put(APPLITOOLS.DEFAULT_MATCH_LEVEL, getMatchLevel());
             applitoolsConfiguration.put(APPLITOOLS.RECTANGLE_SIZE, getViewportSize());
+            updateApplitoolsProxyUrl();
             applitoolsConfiguration.put(APPLITOOLS.IS_BENCHMARKING_ENABLED,
                                         isBenchmarkingEnabled());
             applitoolsConfiguration.put(APPLITOOLS.DISABLE_BROWSER_FETCHING,
@@ -545,6 +555,17 @@ class Setup {
         }
         LOGGER.info(String.format("applitoolsConfiguration: %s", applitoolsConfiguration));
         return applitoolsConfiguration;
+    }
+
+    private static void updateApplitoolsProxyUrl() {
+        String providedProxyKey = (String) applitoolsConfiguration.getOrDefault(APPLITOOLS.PROXY_KEY,
+                                                                                APPLITOOLS.PROXY_KEY);
+        if (providedProxyKey.isBlank()) {
+            providedProxyKey = APPLITOOLS.PROXY_KEY;
+        }
+        applitoolsConfiguration.put(APPLITOOLS.PROXY_KEY, getOverriddenStringValue(APPLITOOLS.PROXY_KEY, providedProxyKey));
+        applitoolsConfiguration.put(APPLITOOLS.PROXY_URL, getOverriddenStringValue(
+                (String) applitoolsConfiguration.get(APPLITOOLS.PROXY_KEY)));
     }
 
     private static String getStringValueFromPropertiesIfAvailable(String key, String defaultValue) {
